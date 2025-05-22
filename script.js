@@ -1,74 +1,43 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Tab switching
+    // Element selectors
     const calculatorTab = document.getElementById('calculator-tab');
     const infoTab = document.getElementById('info-tab');
     const calculatorContent = document.getElementById('calculator-content');
     const infoContent = document.getElementById('info-content');
     const currentYearSpan = document.getElementById('current-year');
 
-    if (currentYearSpan) {
-        currentYearSpan.textContent = new Date().getFullYear();
-    }
-
-    if (calculatorTab && infoTab && calculatorContent && infoContent) {
-        calculatorTab.addEventListener('click', function() {
-            calculatorTab.classList.add('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
-            calculatorTab.classList.remove('text-gray-500');
-            infoTab.classList.remove('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
-            infoTab.classList.add('text-gray-500');
-            calculatorContent.classList.remove('hidden');
-            infoContent.classList.add('hidden');
-        });
-
-        infoTab.addEventListener('click', function() {
-            infoTab.classList.add('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
-            infoTab.classList.remove('text-gray-500');
-            calculatorTab.classList.remove('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
-            calculatorTab.classList.add('text-gray-500');
-            infoContent.classList.remove('hidden');
-            calculatorContent.classList.add('hidden');
-            populateInfoTable(); // Popular a tabela de informações ao clicar na aba
-        });
-    }
-
-    // Competence selection
+    const competenceFilterInput = document.getElementById('competence-filter');
     const competenceSelect = document.getElementById('competence');
     const quantityContainer = document.getElementById('quantity-container');
     const monthsContainer = document.getElementById('months-container');
     const quantityInput = document.getElementById('quantity');
     const monthsInput = document.getElementById('months');
+    
+    const addBtn = document.getElementById('add-btn');
+    const detailsContainer = document.getElementById('details-container');
+    const itemsTableBody = document.getElementById('items-table-body');
+    const totalScoreElement = document.getElementById('total-score');
+    const resetBtn = document.getElementById('reset-btn');
+    const printBtn = document.getElementById('print-btn');
 
-    if (competenceSelect && quantityContainer && monthsContainer && quantityInput && monthsInput) {
-        competenceSelect.addEventListener('change', function() {
-            const selectedValue = this.value;
-            const selectedCompetenceData = competenceData[selectedValue];
-            
-            quantityContainer.classList.add('hidden');
-            monthsContainer.classList.add('hidden');
-            
-            if (selectedCompetenceData) {
-                if (selectedCompetenceData.requiresMonths) {
-                    monthsContainer.classList.remove('hidden');
-                    monthsContainer.querySelector('label').textContent = `Meses (${selectedCompetenceData.unit})`;
-                } else {
-                    quantityContainer.classList.remove('hidden');
-                    // Ajustar o label do campo de quantidade para refletir a unidade
-                    let unitLabel = selectedCompetenceData.unit.charAt(0).toUpperCase() + selectedCompetenceData.unit.slice(1);
-                    if (selectedCompetenceData.unit === 'bloco de 10h') unitLabel = 'Blocos de 10h';
-                    else if (selectedCompetenceData.unit === 'ano' || selectedCompetenceData.unit === 'ano de mandato') unitLabel = 'Anos';
-                    
-                    quantityContainer.querySelector('label').textContent = `Quantidade (${unitLabel})`;
-                }
-            }
-        });
-    }
+    const achievementToast = document.getElementById('achievement-toast');
+    const achievementToastText = achievementToast ? achievementToast.querySelector('span') : null;
+    const achievementsListUL = document.getElementById('achievements-list');
+    const noAchievementsLI = document.getElementById('no-achievements');
 
-    // Data storage
+
+    // --- Persistência de Dados (Session Storage) ---
+    const STORAGE_KEY_ITEMS = 'saberesCompetenciasItems';
+    const STORAGE_KEY_SCORE = 'saberesCompetenciasScore';
+    const STORAGE_KEY_ACHIEVEMENTS = 'saberesCompetenciasAchievements';
+
+    // --- Data ---
     let items = [];
     let totalScore = 0;
+    let unlockedAchievements = new Set(); // Usar Set para evitar duplicatas
 
-    // Competence data
     const competenceData = {
+        // ... (COPIAR TODO O OBJETO competenceData DA VERSÃO ANTERIOR AQUI) ...
         // Itens Originais
         '1': { name: 'Atuação como fiscal de contratos, convênios e acordos', unit: 'mês', pointsPerUnit: 0.1, requiresMonths: true },
         '2': { name: 'Atuação como gestor de contratos, convênios e acordos', unit: 'mês', pointsPerUnit: 0.2, requiresMonths: true },
@@ -109,13 +78,13 @@ document.addEventListener('DOMContentLoaded', function() {
         '36': { name: 'Exercício em Cargo de Direção (CD) ou equivalente', unit: 'mês', pointsPerUnit: 0.25, requiresMonths: true },
         '37': { name: 'Exercício em Função Gratificada (FG) ou equivalente', unit: 'mês', pointsPerUnit: 0.1, requiresMonths: true },
         '38': { name: 'Responsável por setor, unidade ou equipe', unit: 'mês', pointsPerUnit: 0.1, requiresMonths: true },
-        '39': { name: 'Substituição de função (CD) ou equivalente', unit: 'bloco de 30 dias', pointsPerUnit: 0.25, requiresMonths: false }, // Usuário insere número de blocos de 30 dias
-        '40': { name: 'Substituição de função (FG) ou equivalente', unit: 'bloco de 30 dias', pointsPerUnit: 0.1, requiresMonths: false }, // Usuário insere número de blocos de 30 dias
+        '39': { name: 'Substituição de função (CD) ou equivalente', unit: 'bloco de 30 dias', pointsPerUnit: 0.25, requiresMonths: false }, 
+        '40': { name: 'Substituição de função (FG) ou equivalente', unit: 'bloco de 30 dias', pointsPerUnit: 0.1, requiresMonths: false }, 
         '41': { name: 'Certificação de proficiência ou curso em LIBRAS e/ou língua estrangeira', unit: 'certificação', pointsPerUnit: 5, requiresMonths: false },
         '42': { name: 'Certificação Profissional na área de atuação', unit: 'certificação', pointsPerUnit: 1, requiresMonths: false },
         '43': { name: 'Participação em capacitações como instrutor ou conteudista em curso de formação, de desenvolvimento ou de treinamento', unit: 'curso', pointsPerUnit: 1, requiresMonths: false },
         '44': { name: 'Participação em capacitações como tutor, monitor, orientador ou mentor em curso de formação, de desenvolvimento ou de treinamento', unit: 'participação', pointsPerUnit: 0.5, requiresMonths: false },
-        '45': { name: 'Participação em capacitações, incluindo disciplinas isoladas em cursos de graduação e pós-graduação', unit: 'bloco de 10h', pointsPerUnit: 0.2, requiresMonths: false }, // 0.2 pontos a cada 10h
+        '45': { name: 'Participação em capacitações, incluindo disciplinas isoladas em cursos de graduação e pós-graduação', unit: 'bloco de 10h', pointsPerUnit: 0.2, requiresMonths: false }, 
         '46': { name: 'Títulos de educação formal que excedam o nível exigido para o ingresso no cargo', unit: 'diploma/certificado', pointsPerUnit: 5, requiresMonths: false },
         '47': { name: 'Autoria de obras artísticas e cultural registradas', unit: 'obra', pointsPerUnit: 2.5, requiresMonths: false },
         '48': { name: 'Autor de projeto aprovado em edital de pesquisa e/ou extensão', unit: 'edital/projeto', pointsPerUnit: 2.5, requiresMonths: false },
@@ -137,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
         '67': { name: 'Participação em comissão de elaboração/reformulação de projetos pedagógicos de cursos', unit: 'projeto', pointsPerUnit: 0.5, requiresMonths: false },
         '68': { name: 'Participação em conselhos editoriais', unit: 'livro/periódico', pointsPerUnit: 2.5, requiresMonths: false },
         '69': { name: 'Participação em coordenação de elaboração/reformulação de projetos pedagógicos de cursos', unit: 'projeto', pointsPerUnit: 1, requiresMonths: false },
-        '70': { name: 'Participação em grupo de pesquisa registrado', unit: 'projeto', pointsPerUnit: 1, requiresMonths: false }, // CSV diz "Por projeto" como unidade
+        '70': { name: 'Participação em grupo de pesquisa registrado', unit: 'projeto', pointsPerUnit: 1, requiresMonths: false }, 
         '71': { name: 'Participação em projeto de implantação/implementação de ambientes de ensino/aprendizagem, laboratórios, etc.', unit: 'projeto', pointsPerUnit: 1, requiresMonths: false },
         '72': { name: 'Participação em projetos de desenvolvimento institucional e/ou ensino e/ou pesquisa e/ou extensão e/ou inovação e/ou assistência', unit: 'projeto', pointsPerUnit: 1, requiresMonths: false },
         '73': { name: 'Participação na organização de congresso, simpósio, conferência, etc.', unit: 'evento', pointsPerUnit: 1, requiresMonths: false },
@@ -155,16 +124,152 @@ document.addEventListener('DOMContentLoaded', function() {
         '86': { name: 'Participação como tutor de servidor em estágio probatório', unit: 'tutoria', pointsPerUnit: 0.5, requiresMonths: false },
         '87': { name: 'Participação no apoio a atividades de preceptoria em residências médica e multiprofissional', unit: 'declaração semestral', pointsPerUnit: 0.1, requiresMonths: false },
     };
+    // --- Achievements Configuration ---
+    const achievementsConfig = [
+        { id: 'beginner_collector', name: 'RSC-TAE I', condition: () => totalScore >= 10 && items.length >= 2, icon: 'fas fa-star' },
+        { id: 'point_starter', name: 'RSC-TAE II', condition: () => totalScore >= 15 && items.length >= 3, icon: 'fas fa-arrow-up' },
+        { id: 'diligent_participant', name: 'RSC-TAE III', condition: () => totalScore >= 25 && items.length >= 4, icon: 'fas fa-medal' },
+        { id: 'score_master', name: 'RSC-TAE IV', condition: () => totalScore >= 30 && items.length >= 5, icon: 'fas fa-crown' },
+        { id: 'knowledge_expert', name: 'RSC-TAE V', condition: () => totalScore >= 52 && items.length >=8 , icon: 'fas fa-brain' },
+        { id: 'expert_collector', name: 'RSC-TAE VI', condition: () => totalScore >= 75 && items.length >=12 , icon: 'fas fa-award' }
+    ];
 
-    // Element selectors
-    const addBtn = document.getElementById('add-btn');
-    const detailsContainer = document.getElementById('details-container');
-    const itemsTableBody = document.getElementById('items-table-body');
-    const totalScoreElement = document.getElementById('total-score');
-    const resetBtn = document.getElementById('reset-btn');
-    const printBtn = document.getElementById('print-btn');
 
-    // Add item
+    // --- Helper Functions ---
+    function saveDataToSession() {
+        sessionStorage.setItem(STORAGE_KEY_ITEMS, JSON.stringify(items));
+        sessionStorage.setItem(STORAGE_KEY_SCORE, totalScore.toString());
+        sessionStorage.setItem(STORAGE_KEY_ACHIEVEMENTS, JSON.stringify(Array.from(unlockedAchievements)));
+    }
+
+    function loadDataFromSession() {
+        const storedItems = sessionStorage.getItem(STORAGE_KEY_ITEMS);
+        const storedScore = sessionStorage.getItem(STORAGE_KEY_SCORE);
+        const storedAchievements = sessionStorage.getItem(STORAGE_KEY_ACHIEVEMENTS);
+
+        if (storedItems) {
+            items = JSON.parse(storedItems);
+        }
+        if (storedScore) {
+            totalScore = parseFloat(storedScore);
+        }
+        if (storedAchievements) {
+            unlockedAchievements = new Set(JSON.parse(storedAchievements));
+        }
+    }
+    
+    function populateCompetenceSelect(filterText = "") {
+        if (!competenceSelect) return;
+        const previouslySelectedValue = competenceSelect.value; // Store previous selection
+        competenceSelect.innerHTML = ''; // Clear existing options
+
+        const firstOption = document.createElement('option');
+        firstOption.value = "";
+        firstOption.textContent = "Selecione uma competência";
+        if (!filterText) { // Only add "Selecione" if no filter or filter is empty
+             competenceSelect.appendChild(firstOption);
+        }
+
+
+        const sortedCompetenceKeys = Object.keys(competenceData).sort((a, b) => parseInt(a) - parseInt(b));
+        let hasVisibleOptions = false;
+
+        sortedCompetenceKeys.forEach(key => {
+            const competence = competenceData[key];
+            if (competence.name.toLowerCase().includes(filterText.toLowerCase())) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = `${key} - ${competence.name}`;
+                competenceSelect.appendChild(option);
+                hasVisibleOptions = true;
+            }
+        });
+        
+        // Restore selection if the option still exists
+        if (Array.from(competenceSelect.options).some(opt => opt.value === previouslySelectedValue)) {
+            competenceSelect.value = previouslySelectedValue;
+        } else if (hasVisibleOptions && filterText) {
+             // If filtering and previous selection is gone, auto-select the first visible if not "Selecione"
+            if (competenceSelect.options.length > 0 && competenceSelect.options[0].value !== "") {
+                competenceSelect.value = competenceSelect.options[0].value;
+            } else {
+                 competenceSelect.value = ""; // Fallback to no selection
+            }
+        } else if (!hasVisibleOptions && filterText) {
+             const noResultsOption = document.createElement('option');
+             noResultsOption.value = "";
+             noResultsOption.textContent = "Nenhuma competência encontrada";
+             noResultsOption.disabled = true;
+             competenceSelect.appendChild(noResultsOption);
+             competenceSelect.value = "";
+        } else if (!filterText && competenceSelect.options[0]?.value === "") {
+            competenceSelect.value = ""; // Default to "Selecione..." if no filter
+        }
+        // Trigger change to update quantity/months fields if a value is auto-selected
+        const event = new Event('change');
+        competenceSelect.dispatchEvent(event);
+    }
+
+    // --- Initialization ---
+    if (currentYearSpan) {
+        currentYearSpan.textContent = new Date().getFullYear();
+    }
+    loadDataFromSession();
+    populateCompetenceSelect(); // Initial population
+    updateUI(); // Update UI with loaded data
+
+    // --- Event Listeners ---
+    if (calculatorTab && infoTab && calculatorContent && infoContent) {
+        calculatorTab.addEventListener('click', function() {
+            calculatorTab.classList.add('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
+            calculatorTab.classList.remove('text-gray-500');
+            infoTab.classList.remove('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
+            infoTab.classList.add('text-gray-500');
+            calculatorContent.classList.remove('hidden');
+            infoContent.classList.add('hidden');
+        });
+
+        infoTab.addEventListener('click', function() {
+            infoTab.classList.add('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
+            infoTab.classList.remove('text-gray-500');
+            calculatorTab.classList.remove('text-indigo-600', 'border-indigo-600', 'bg-indigo-50');
+            calculatorTab.classList.add('text-gray-500');
+            infoContent.classList.remove('hidden');
+            calculatorContent.classList.add('hidden');
+            populateInfoTable(); 
+        });
+    }
+
+    if (competenceFilterInput) {
+        competenceFilterInput.addEventListener('input', function() {
+            populateCompetenceSelect(this.value);
+        });
+    }
+    
+    if (competenceSelect && quantityContainer && monthsContainer && quantityInput && monthsInput) {
+        competenceSelect.addEventListener('change', function() {
+            const selectedValue = this.value;
+            const selectedCompetenceData = competenceData[selectedValue];
+            
+            quantityContainer.classList.add('hidden');
+            monthsContainer.classList.add('hidden');
+            
+            if (selectedCompetenceData) {
+                if (selectedCompetenceData.requiresMonths) {
+                    monthsContainer.classList.remove('hidden');
+                    monthsContainer.querySelector('label').textContent = `Meses`;
+                } else {
+                    quantityContainer.classList.remove('hidden');
+                    let unitLabel = selectedCompetenceData.unit.charAt(0).toUpperCase() + selectedCompetenceData.unit.slice(1);
+                    if (selectedCompetenceData.unit === 'bloco de 10h') unitLabel = 'Blocos de 10h';
+                    else if (selectedCompetenceData.unit === 'ano completo' || selectedCompetenceData.unit === 'ano de mandato') unitLabel = 'Anos';
+                    else if (selectedCompetenceData.unit === 'bloco de 30 dias') unitLabel = 'Blocos de 30 dias';
+                    quantityContainer.querySelector('label').textContent = `${unitLabel}`;
+                }
+            }
+        });
+    }
+
     if (addBtn && competenceSelect && quantityInput && monthsInput && competenceData) {
         addBtn.addEventListener('click', function() {
             const selectedCompetenceValue = competenceSelect.value;
@@ -189,70 +294,69 @@ document.addEventListener('DOMContentLoaded', function() {
                     monthsInput.focus();
                     return;
                 }
-                points = quantityValue * competence.pointsPerUnit;
-                description = `${quantityValue} ${competence.unit}${quantityValue > 1 ? (competence.unit === 'mês' ? 'es' : 's') : ''}`;
             } else {
                 quantityValue = parseInt(quantityInput.value);
                  if (isNaN(quantityValue) || quantityValue < 1) {
-                    alert('Por favor, insira uma quantidade válida (maior ou igual a 1).');
+                    alert(`Por favor, insira uma quantidade válida para "${competence.unit}" (maior ou igual a 1).`);
                     quantityInput.focus();
                     return;
                 }
-                points = quantityValue * competence.pointsPerUnit;
-                // Pluralização da unidade de forma mais genérica
-                let pluralUnit = competence.unit;
-                if (quantityValue > 1) {
-                    if (competence.unit.endsWith('s') || competence.unit.endsWith('z') || competence.unit.endsWith('r')) {
-                        pluralUnit += 'es';
-                    } else if (competence.unit.endsWith('ão')) {
-                         pluralUnit = competence.unit.slice(0, -2) + 'ões';
-                    } else if (competence.unit.endsWith('al') || competence.unit.endsWith('el') || competence.unit.endsWith('ol') || competence.unit.endsWith('ul')) {
-                        pluralUnit = competence.unit.slice(0, -1) + 'is';
-                    } else {
-                        pluralUnit += 's';
-                    }
-                }
-                description = `${quantityValue} ${quantityValue > 1 ? pluralUnit : competence.unit}`;
             }
+            points = quantityValue * competence.pointsPerUnit;
+            let pluralUnit = competence.unit;
+            if (quantityValue > 1) {
+                // Basic pluralization, can be improved
+                if(competence.unit === 'mês') pluralUnit = 'meses';
+                else if (competence.unit.endsWith('ão')) pluralUnit = competence.unit.slice(0, -2) + 'ões';
+                else if (competence.unit.endsWith('al')) pluralUnit = competence.unit.slice(0, -1) + 'is';
+                else if (!competence.unit.endsWith('s')) pluralUnit = competence.unit + 's';
+            }
+            description = `${quantityValue} ${pluralUnit}`;
             
             const item = {
                 id: Date.now(),
                 competenceId: selectedCompetenceValue,
                 name: competence.name,
                 quantity: quantityValue,
-                unit: competence.unit, // Armazena a unidade base
+                unit: competence.unit, 
                 points: points,
-                description: description // Descrição já formatada com plural
+                description: description 
             };
             
             items.push(item);
             totalScore += points;
             
             updateUI();
+            checkAchievements();
+            saveDataToSession();
             
-            competenceSelect.value = '';
+            competenceFilterInput.value = ""; // Clear filter
+            populateCompetenceSelect(); // Repopulate full list
+            competenceSelect.value = ''; // Reset select
             if (quantityContainer) quantityContainer.classList.add('hidden');
             if (monthsContainer) monthsContainer.classList.add('hidden');
             quantityInput.value = '1';
             monthsInput.value = '1';
+            competenceSelect.dispatchEvent(new Event('change')); // Ensure dependent fields are reset
         });
     }
 
     // Remove item function
-    function removeItem(id) {
+    window.removeItem = function(id) { // Make it global for onclick
         const itemIndex = items.findIndex(item => item.id === id);
         if (itemIndex !== -1) {
             totalScore -= items[itemIndex].points;
             items.splice(itemIndex, 1);
             updateUI();
+            // Note: Achievements are generally not "un-achieved" by removing items,
+            // but you could add logic here if desired.
+            saveDataToSession();
         }
     }
-    window.removeItem = removeItem; 
 
-    // Update UI
     function updateUI() {
         if (totalScoreElement) {
-            totalScoreElement.textContent = totalScore.toFixed(2).replace('.', ','); // Exibir com vírgula
+            totalScoreElement.textContent = totalScore.toFixed(2).replace('.', ',');
         }
         
         if (detailsContainer) {
@@ -298,19 +402,80 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         }
+        updateAchievementsList();
     }
+    
+    function checkAchievements() {
+        let newAchievementUnlocked = false;
+        achievementsConfig.forEach(ach => {
+            if (!unlockedAchievements.has(ach.id) && ach.condition()) {
+                unlockedAchievements.add(ach.id);
+                showAchievementToast(ach.name);
+                newAchievementUnlocked = true;
+            }
+        });
+        if(newAchievementUnlocked) {
+            updateAchievementsList();
+            saveDataToSession(); // Save new achievement state
+        }
+    }
+
+    function showAchievementToast(achievementName) {
+        if (!achievementToast || !achievementToastText) return;
+        achievementToastText.textContent = `Conquista: ${achievementName}!`;
+        achievementToast.classList.remove('hidden', 'fade-out');
+        achievementToast.classList.add('fade-in');
+
+        setTimeout(() => {
+            achievementToast.classList.remove('fade-in');
+            achievementToast.classList.add('fade-out');
+            setTimeout(() => { // ensure fade-out completes before hiding
+                 achievementToast.classList.add('hidden');
+            }, 500);
+        }, 3000);
+    }
+    
+    function updateAchievementsList() {
+        if (!achievementsListUL || !noAchievementsLI) return;
+        
+        achievementsListUL.innerHTML = ''; // Clear current list items except the placeholder
+
+        if (unlockedAchievements.size === 0) {
+            achievementsListUL.appendChild(noAchievementsLI);
+            noAchievementsLI.style.display = 'list-item';
+        } else {
+            noAchievementsLI.style.display = 'none';
+            unlockedAchievements.forEach(achId => {
+                const achievement = achievementsConfig.find(a => a.id === achId);
+                if (achievement) {
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<i class="${achievement.icon} text-yellow-500 mr-2"></i>${achievement.name}`;
+                    achievementsListUL.appendChild(listItem);
+                }
+            });
+        }
+    }
+
 
     // Reset
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
-            items = [];
-            totalScore = 0;
-            updateUI();
-            if (competenceSelect) competenceSelect.value = '';
-            if (quantityContainer) quantityContainer.classList.add('hidden');
-            if (monthsContainer) monthsContainer.classList.add('hidden');
-            if (quantityInput) quantityInput.value = '1';
-            if (monthsInput) monthsInput.value = '1';
+            if (confirm("Tem certeza que deseja reiniciar? Todos os itens e conquistas desta sessão serão perdidos.")) {
+                items = [];
+                totalScore = 0;
+                unlockedAchievements.clear(); // Clear achievements as well on reset
+                updateUI();
+                saveDataToSession(); // Clear session storage
+                
+                if (competenceFilterInput) competenceFilterInput.value = "";
+                populateCompetenceSelect();
+                if (competenceSelect) competenceSelect.value = '';
+                if (quantityContainer) quantityContainer.classList.add('hidden');
+                if (monthsContainer) monthsContainer.classList.add('hidden');
+                if (quantityInput) quantityInput.value = '1';
+                if (monthsInput) monthsInput.value = '1';
+                if (competenceSelect) competenceSelect.dispatchEvent(new Event('change'));
+            }
         });
     }
     
@@ -322,10 +487,10 @@ document.addEventListener('DOMContentLoaded', function() {
             <table class="min-w-full bg-white rounded-lg overflow-hidden">
                 <thead class="bg-indigo-600 text-white">
                     <tr>
-                        <th class="py-3 px-4 text-left">No.</th>
-                        <th class="py-3 px-4 text-left">Competência</th>
-                        <th class="py-3 px-4 text-left">Unidade de Medida</th>
-                        <th class="py-3 px-4 text-right">Pontos por Unidade</th>
+                        <th class="py-3 px-4 text-left text-xs sm:text-sm">No.</th>
+                        <th class="py-3 px-4 text-left text-xs sm:text-sm">Competência</th>
+                        <th class="py-3 px-4 text-left text-xs sm:text-sm">Unidade de Medida</th>
+                        <th class="py-3 px-4 text-right text-xs sm:text-sm">Pontos por Unidade</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -349,13 +514,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 unitDescription = `Por ${competence.unit}`;
             }
 
-
             tableHTML += `
                 <tr>
-                    <td class="py-3 px-4">${key}</td>
-                    <td class="py-3 px-4">${competence.name}</td>
-                    <td class="py-3 px-4">${unitDescription}</td>
-                    <td class="py-3 px-4 text-right">${competence.pointsPerUnit.toString().replace('.', ',')}</td>
+                    <td class="py-2 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm">${key}</td>
+                    <td class="py-2 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm">${competence.name}</td>
+                    <td class="py-2 px-3 sm:py-3 sm:px-4 text-xs sm:text-sm">${unitDescription}</td>
+                    <td class="py-2 px-3 sm:py-3 sm:px-4 text-right text-xs sm:text-sm">${competence.pointsPerUnit.toString().replace('.', ',')}</td>
                 </tr>
             `;
         }
@@ -367,10 +531,10 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = tableHTML;
     }
 
-
     // Print
     if (printBtn) {
         printBtn.addEventListener('click', function() {
+            // ... (COPIAR A FUNÇÃO printBtn DA VERSÃO ANTERIOR AQUI, mantendo as melhorias de formatação) ...
             const printContent = `
                 <div style="padding: 20px; font-family: Arial, sans-serif; color: #333;">
                     <style>
@@ -379,6 +543,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         th { background-color: #4f46e5; color: white; }
                         h1, h2 { color: #4f46e5; }
                         .total-score-value { font-weight: bold; color: #4f46e5; font-size: 1.2em; }
+                        ul.achievements-print { list-style-type: none; padding-left: 0; }
+                        ul.achievements-print li { margin-bottom: 4px; }
                         @page { size: A4; margin: 20mm; }
                         body { margin: 0; }
                     </style>
@@ -412,6 +578,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         </table>
                     </div>
                     ` : '<p style="text-align: center; color: #666;">Nenhum item adicionado para exibir no relatório.</p>'}
+
+                    ${unlockedAchievements.size > 0 ? `
+                    <div style="margin-bottom: 20px;">
+                         <h2 style="font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px;">Conquistas Desbloqueadas</h2>
+                         <ul class="achievements-print">
+                            ${Array.from(unlockedAchievements).map(achId => {
+                                const achievement = achievementsConfig.find(a => a.id === achId);
+                                return achievement ? `<li><i class="${achievement.icon}" style="color: #FFD700;"></i> ${achievement.name}</li>` : '';
+                            }).join('')}
+                         </ul>
+                    </div>
+                    ` : ''}
                     
                     <div style="margin-top: 30px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px;">
                         <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
@@ -426,6 +604,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <html>
                         <head>
                             <title>Relatório de Pontuação - Calculadora de Saberes e Competências</title>
+                            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> <!-- Para ícones no print -->
                             <style>
                                 @media print {
                                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -438,14 +617,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 window.onload = function() {
                                     setTimeout(function() { 
                                         window.print();
-                                        window.onafterprint = function() {
-                                            // Alguns navegadores (ex: Chrome) fecham automaticamente após o print
-                                            // Para outros, podemos tentar fechar.
-                                            // window.close(); 
-                                        }
-                                        // Timeout para garantir que, se onafterprint não funcionar ou o usuário cancelar, a janela não fique aberta para sempre
-                                        // setTimeout(function() { if (!window.closed) { window.close(); } }, 5000);
-                                    }, 500);
+                                        // window.onafterprint = function() { window.close(); } // Descomentar se quiser fechar auto
+                                    }, 700); // Aumentar um pouco o delay para garantir que ícones carreguem
                                 };
                             <\/script>
                         </body>
@@ -455,7 +628,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 alert('Não foi possível abrir a janela de impressão. Verifique se seu navegador está bloqueando pop-ups.');
             }
-        });
-    }
-    updateUI();
+        }
+    )}
+    updateUI(); // Final UI update on load
+    checkAchievements(); // Check achievements on load based on stored data
 });

@@ -5,6 +5,15 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+.fade-out {
+    animation: fadeOut 0.5s ease-in-out forwards;
+}
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
+}
+
 .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -19,4 +28,10 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+/* Estilo para o select quando filtrado e com poucas opções visíveis */
+#competence {
+    max-height: 200px; /* Ajuste conforme necessário */
+    overflow-y: auto;
 }
